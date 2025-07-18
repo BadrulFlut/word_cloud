@@ -91,7 +91,6 @@ class WordCloudSetting {
   }
 
   void setInitial() {
-    //map = [[]];
     textCenter = [];
     textPoints = [];
     textlist = [];
@@ -102,51 +101,61 @@ class WordCloudSetting {
 
     map = setMap(shape);
 
-    // for (var i = 0; i < mapX; i++) {
-    //   for (var j = 0; j < mapY; j++) {
-    //     if (pow(i - (mapX / 2), 2) + pow(j - (mapY / 2), 2) > pow(250, 2)) {
-    //       map[i].add(1);
-    //     } else {
-    //       map[i].add(0);
-    //     }
-    //   }
-    //   map.add([]);
-    // }
-
     for (var i = 0; i < data.length; i++) {
-      double denominator = data[0]['value'] - data[data.length - 1]['value'];
+      double denominator = (data[0]['value'] as num).toDouble() -
+          (data[data.length - 1]['value'] as num).toDouble();
 
       double getTextSize;
       if (denominator != 0) {
-        getTextSize = (minTextSize * (data[0]['value'] - data[i]['value']) +
+        getTextSize = (minTextSize *
+                    ((data[0]['value'] as num).toDouble() -
+                        (data[i]['value'] as num).toDouble()) +
                 maxTextSize *
-                    (data[i]['value'] - data[data.length - 1]['value'])) /
+                    ((data[i]['value'] as num).toDouble() -
+                        (data[data.length - 1]['value'] as num).toDouble())) /
             denominator;
       } else {
         getTextSize = (minTextSize + maxTextSize) / 2;
       }
 
-      final textSpan = TextSpan(
-        text: data[i]['word'],
-        style: TextStyle(
-          color: colorList?[Random().nextInt(colorList!.length)],
-          fontSize: getTextSize,
-          fontWeight: fontWeight,
-          fontFamily: fontFamily,
-          fontStyle: fontStyle,
-        ),
-      );
-
-      final textPainter = TextPainter()
-        ..text = textSpan
-        ..textDirection = TextDirection.ltr
-        ..textAlign = TextAlign.center
-        ..layout();
+      // Mulai auto-fit: kecilkan font jika tidak muat
+      double fontSize = getTextSize;
+      TextPainter textPainter;
+      double centerCorrectionX;
+      double centerCorrectionY;
+      int fontTries = 0;
+      bool fits = false;
+      do {
+        final textSpan = TextSpan(
+          text: data[i]['word'],
+          style: TextStyle(
+            color: colorList?[Random().nextInt(colorList!.length)],
+            fontSize: fontSize,
+            fontWeight: fontWeight,
+            fontFamily: fontFamily,
+            fontStyle: fontStyle,
+          ),
+        );
+        textPainter = TextPainter()
+          ..text = textSpan
+          ..textDirection = TextDirection.ltr
+          ..textAlign = TextAlign.center
+          ..layout();
+        centerCorrectionX = centerX - textPainter.width / 2;
+        centerCorrectionY = centerY - textPainter.height / 2;
+        // Cek apakah muat di area
+        if (centerCorrectionX >= 0 &&
+            centerCorrectionY >= 0 &&
+            centerCorrectionX + textPainter.width <= mapX &&
+            centerCorrectionY + textPainter.height <= mapY) {
+          fits = true;
+        } else {
+          fontSize *= 0.9;
+        }
+        fontTries++;
+      } while (!fits && fontSize > minTextSize && fontTries < 10);
 
       textlist.add(textPainter);
-
-      double centerCorrectionX = centerX - textlist[i].width / 2;
-      double centerCorrectionY = centerY - textlist[i].height / 2;
       textCenter.add([centerCorrectionX, centerCorrectionY]);
       textPoints.add([]);
       isdrawed.add(false);
@@ -231,10 +240,16 @@ class WordCloudSetting {
 
   void drawIn(int index, double x, double y) {
     textPoints[index] = [x, y];
-    for (int i = x.toInt(); i < x.toInt() + textlist[index].width; i++) {
-      for (int j = y.toInt();
-          j < y.toInt() + textlist[index].height.floor();
-          j++) {
+    int startX = x.toInt().clamp(0, map.length - 1).toInt();
+    int endX =
+        (x.toInt() + textlist[index].width).clamp(0, map.length - 1).toInt();
+    int startY = y.toInt().clamp(0, map[0].length - 1).toInt();
+    int endY = (y.toInt() + textlist[index].height.floor())
+        .clamp(0, map[0].length - 1)
+        .toInt();
+
+    for (int i = startX; i < endX; i++) {
+      for (int j = startY; j < endY; j++) {
         map[i][j] = 1;
       }
     }

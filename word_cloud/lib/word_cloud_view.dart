@@ -51,23 +51,44 @@ class _WordCloudViewState extends State<WordCloudView> {
       wcshape = widget.shape!;
     }
 
-    wordcloudsetting = WordCloudSetting(
-      data: widget.data.getData(),
-      minTextSize: widget.mintextsize,
-      maxTextSize: widget.maxtextsize,
-      attempt: widget.attempt,
-      shape: wcshape,
-    );
-
-    wordcloudsetting.setMapSize(widget.mapwidth, widget.mapheight);
-    wordcloudsetting.setFont(
-        widget.fontFamily, widget.fontStyle, widget.fontWeight);
-    wordcloudsetting.setColorList(widget.colorlist);
-    wordcloudsetting.setInitial();
-    
-    wordcloudsetting.drawTextOptimized();
-    
+    double maxTextSize = widget.maxtextsize;
+    double minTextSize = widget.mintextsize;
+    bool hasOverflow = true;
+    int maxTries = 10;
+    int tries = 0;
+    while (hasOverflow && tries < maxTries) {
+      wordcloudsetting = WordCloudSetting(
+        data: widget.data.getData(),
+        minTextSize: minTextSize,
+        maxTextSize: maxTextSize,
+        attempt: widget.attempt,
+        shape: wcshape,
+      );
+      wordcloudsetting.setMapSize(widget.mapwidth, widget.mapheight);
+      wordcloudsetting.setFont(
+          widget.fontFamily, widget.fontStyle, widget.fontWeight);
+      wordcloudsetting.setColorList(widget.colorlist);
+      wordcloudsetting.setInitial();
+      wordcloudsetting.drawTextOptimized();
+      hasOverflow = false;
+      for (var i = 0; i < wordcloudsetting.textlist.length; i++) {
+        final tp = wordcloudsetting.textlist[i];
+        final pt = wordcloudsetting.textPoints[i];
+        if (pt[0] < 0 ||
+            pt[1] < 0 ||
+            pt[0] + tp.width > widget.mapwidth ||
+            pt[1] + tp.height > widget.mapheight) {
+          hasOverflow = true;
+          break;
+        }
+      }
+      if (hasOverflow) {
+        maxTextSize = maxTextSize * 0.9;
+      }
+      tries++;
+    }
   }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -75,8 +96,15 @@ class _WordCloudViewState extends State<WordCloudView> {
       height: widget.mapheight,
       color: widget.mapcolor,
       decoration: widget.decoration,
-      child: CustomPaint(
-        painter: WCpaint(wordcloudpaint: wordcloudsetting),
+      child: FittedBox(
+        fit: BoxFit.contain,
+        child: SizedBox(
+          width: widget.mapwidth,
+          height: widget.mapheight,
+          child: CustomPaint(
+            painter: WCpaint(wordcloudpaint: wordcloudsetting),
+          ),
+        ),
       ),
     );
   }
